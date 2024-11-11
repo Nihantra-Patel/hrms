@@ -54,9 +54,22 @@ frappe.ui.form.on("Interview", {
 		);
 
 		if (allow_feedback_submission) {
-			frm.page.set_primary_action(__("Submit Feedback"), () => {
-				frm.trigger("submit_feedback");
-			});
+			frappe.db
+				.get_value(
+					"Interview Feedback",
+					{
+						interview: frm.doc.name,
+						docstatus: 1,
+					},
+					"name",
+				)
+				.then((feedback) => {
+					if (!feedback.message || Object.keys(feedback.message).length === 0) {
+						frm.page.set_primary_action(__("Submit Feedback"), () => {
+							frm.trigger("submit_feedback");
+						});
+					}
+				});
 		} else {
 			const button = frm.add_custom_button(__("Submit Feedback"), () => {
 				frm.trigger("submit_feedback");
