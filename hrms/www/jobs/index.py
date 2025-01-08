@@ -9,8 +9,10 @@ from frappe.utils import pretty_date
 
 def get_context(context):
 	context.no_cache = 1
-	breadcrumb = _("Home") if frappe.session.user == "Guest" else _("My Account")
-	context.parents = [{"name": breadcrumb, "route": "/"}]
+	if frappe.session.user == "Guest":
+		context.parents = [{"name": _("Home"), "route": "/"}]
+	else:
+		context.parents = [{"name": _("My Account"), "route": "/me"}]
 	context.body_class = "jobs-page"
 	page_len = 20
 	filters, txt, sort, offset = get_filters_txt_sort_offset(page_len)
