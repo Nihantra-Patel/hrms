@@ -25,8 +25,7 @@ class TestUploadAttendance(HRMSTestSuite):
 		employee_doc.date_of_joining = date_of_joining
 		employee_doc.relieving_date = relieving_date
 		employee_doc.save()
-		args = {"from_date": from_date, "to_date": to_date}
-		data = get_data(args)
+		data = get_data(from_date, to_date)
 		filtered_data = []
 		for row in data:
 			if row[1] == employee:

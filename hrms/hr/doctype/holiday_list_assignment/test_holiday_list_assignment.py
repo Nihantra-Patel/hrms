@@ -74,6 +74,56 @@ class IntegrationTestHolidayListAssignment(HRMSTestSuite):
 		holiday_list = get_holiday_list_for_employee(employee, as_on=getdate())
 		self.assertEqual(holiday_list, self.holiday_list)
 
+	def test_resolve_holiday_list_for_past_period(self):
+		"""
+		Regression test for https://github.com/frappe/hrms/issues/4676
+
+		When a document is created on a later date for an earlier period, the holiday
+		list active during that earlier period (not the one active "today") must be used.
+		Callers pass the period date via `as_on`; without it the latest list is wrongly
+		returned for past periods.
+		"""
+		employee = make_employee("test_past_period_hla@example.com", company="_Test Company")
+
+		# Holiday list active for the first half of the year
+		first_half_list = make_holiday_list(
+			list_name="Test HLA First Half",
+			from_date=get_year_start(getdate()),
+			to_date=add_months(get_year_start(getdate()), 6),
+		)
+		# Holiday list that took over from the second half of the year
+		second_half_list = make_holiday_list(
+			list_name="Test HLA Second Half",
+			from_date=add_months(get_year_start(getdate()), 6),
+			to_date=get_year_ending(getdate()),
+		)
+
+		create_holiday_list_assignment(
+			"Employee",
+			assigned_to=employee,
+			holiday_list=first_half_list,
+			from_date=get_year_start(getdate()),
+		)
+		create_holiday_list_assignment(
+			"Employee",
+			assigned_to=employee,
+			holiday_list=second_half_list,
+			from_date=add_months(get_year_start(getdate()), 6),
+		)
+
+		# A date in the first period must resolve to the first period's holiday list,
+		# even though a newer list now exists.
+		past_period_list = get_holiday_list_for_employee(
+			employee, as_on=add_months(get_year_start(getdate()), 2)
+		)
+		self.assertEqual(past_period_list, first_half_list)
+
+		# A date in the later period resolves to the later list.
+		current_period_list = get_holiday_list_for_employee(
+			employee, as_on=add_months(get_year_start(getdate()), 8)
+		)
+		self.assertEqual(current_period_list, second_half_list)
+
 
 def create_holiday_list_assignment(
 	applicable_for,

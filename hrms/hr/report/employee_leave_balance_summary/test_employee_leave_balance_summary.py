@@ -40,8 +40,10 @@ class TestEmployeeLeaveBalance(HRMSTestSuite):
 		self.year_start = getdate(get_year_start(self.date))
 		self.year_end = getdate(get_year_ending(self.date))
 
+		# Start the holiday list (and its assignment) before the earliest leave/allocation
+		# date used below so holiday list resolution by `as_on` covers them.
 		self.holiday_list = make_holiday_list(
-			"_Test Emp Balance Holiday List", self.year_start, self.year_end
+			"_Test Emp Balance Holiday List", add_days(self.year_start, -15), self.year_end
 		)
 
 	@assign_holiday_list("_Test Emp Balance Holiday List", "_Test Company")

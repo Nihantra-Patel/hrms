@@ -45,7 +45,7 @@ def get_template():
 	w = add_header(w)
 
 	try:
-		w = add_data(w, args)
+		w = add_data(w, args.from_date, args.to_date)
 	except Exception as e:
 		frappe.clear_messages()
 		frappe.respond_as_web_page("Holiday List Missing", html=e)
@@ -69,19 +69,19 @@ def add_header(w):
 	return w
 
 
-def add_data(w, args):
-	data = get_data(args)
+def add_data(w, from_date, to_date):
+	data = get_data(from_date, to_date)
 	writedata(w, data)
 	return w
 
 
-def get_data(args):
-	dates = get_dates(args)
+def get_data(from_date, to_date):
+	dates = get_dates(from_date, to_date)
 	employees = get_active_employees()
 	holidays = get_holidays_for_employees(
-		[employee.name for employee in employees], args["from_date"], args["to_date"]
+		[employee.name for employee in employees], from_date, to_date
 	)
-	existing_attendance_records = get_existing_attendance_records(args)
+	existing_attendance_records = get_existing_attendance_records(from_date, to_date)
 	data = []
 	for date in dates:
 		for employee in employees:
@@ -99,7 +99,7 @@ def get_data(args):
 			):
 				existing_attendance = existing_attendance_records[tuple([getdate(date), employee.name])]
 
-			employee_holiday_list = get_holiday_list_for_employee(employee.name)
+			employee_holiday_list = get_holiday_list_for_employee(employee.name, as_on=date)
 
 			row = [
 				existing_attendance and existing_attendance.name or "",
@@ -121,7 +121,7 @@ def get_data(args):
 def get_holidays_for_employees(employees, from_date, to_date):
 	holidays = {}
 	for employee in employees:
-		holiday_list = get_holiday_list_for_employee(employee)
+		holiday_list = get_holiday_list_for_employee(employee, as_on=to_date)
 		holiday = get_holiday_dates_for_employee(employee, getdate(from_date), getdate(to_date))
 		if holiday_list not in holidays:
 			holidays[holiday_list] = holiday
@@ -134,10 +134,10 @@ def writedata(w, data):
 		w.writerow(row)
 
 
-def get_dates(args):
+def get_dates(from_date, to_date):
 	"""get list of dates in between from date and to date"""
-	no_of_days = date_diff(add_days(args["to_date"], 1), args["from_date"])
-	dates = [add_days(args["from_date"], i) for i in range(0, no_of_days)]
+	no_of_days = date_diff(add_days(to_date, 1), from_date)
+	dates = [add_days(from_date, i) for i in range(0, no_of_days)]
 	return dates
 
 
@@ -150,11 +150,11 @@ def get_active_employees():
 	return employees
 
 
-def get_existing_attendance_records(args):
+def get_existing_attendance_records(from_date, to_date):
 	attendance = frappe.db.sql(
 		"""select name, attendance_date, employee, status, leave_type, naming_series
 		from `tabAttendance` where attendance_date between %s and %s and docstatus < 2""",
-		(args["from_date"], args["to_date"]),
+		(from_date, to_date),
 		as_dict=1,
 	)
 

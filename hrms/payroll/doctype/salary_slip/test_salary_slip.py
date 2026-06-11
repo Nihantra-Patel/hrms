@@ -47,6 +47,7 @@ from hrms.payroll.doctype.salary_slip.salary_slip import (
 from hrms.payroll.doctype.salary_structure.salary_structure import make_salary_slip
 from hrms.tests.test_utils import get_email_by_subject, get_first_sunday
 from hrms.tests.utils import HRMSTestSuite
+from hrms.utils.holiday_list import get_holiday_dates_between
 
 
 class TestSalarySlip(HRMSTestSuite):
@@ -533,6 +534,63 @@ class TestSalarySlip(HRMSTestSuite):
 
 		self.assertEqual(ss.leave_without_pay, 10)
 		self.assertEqual(ss.payment_days, 17)
+
+	def test_salary_slip_uses_holiday_list_active_during_period(self):
+		"""
+		Regression test for https://github.com/frappe/hrms/issues/4676
+
+		A salary slip created on a later date for an earlier period must use the holiday
+		list that was active during that earlier period, not the one active "today".
+		"""
+		from hrms.hr.doctype.holiday_list_assignment.test_holiday_list_assignment import (
+			create_holiday_list_assignment,
+		)
+
+		# Salary slip period: the first full month of the year (a past period).
+		year_start = get_year_start(getdate())
+		start_date = add_months(year_start, 1)
+		end_date = add_days(add_months(year_start, 2), -1)
+
+		# Switch holiday lists from the month after the period under test, but on or before
+		# today, so the period-correct list differs from the list active "today".
+		switch_date = add_months(start_date, 1)
+		self.assertLess(getdate(end_date), getdate(switch_date))
+		self.assertGreaterEqual(getdate(), getdate(switch_date))
+
+		# A "past period" list and a "current" list with different weekly offs so their
+		# holiday dates differ. Resolving by "today" (the buggy behavior) picks the wrong one.
+		past_list = make_holiday_list(
+			"Test Period HL Past",
+			from_date=year_start,
+			to_date=add_days(switch_date, -1),
+			weekly_off_days=["Sunday"],
+		)
+		current_list = make_holiday_list(
+			"Test Period HL Current",
+			from_date=switch_date,
+			to_date=get_year_ending(getdate()),
+			weekly_off_days=["Saturday"],
+		)
+
+		emp_id = make_employee(
+			"test_period_holiday_list@salary.com",
+			company="_Test Company",
+			holiday_list=past_list,
+		)
+		create_holiday_list_assignment("Employee", emp_id, holiday_list=past_list, from_date=year_start)
+		create_holiday_list_assignment(
+			"Employee", emp_id, holiday_list=current_list, from_date=switch_date
+		)
+
+		ss = make_employee_salary_slip(emp_id, "Monthly", posting_date=start_date)
+
+		# Past period -> must use the past list, not the list active today.
+		holidays = ss.get_holidays_for_employee(start_date, end_date)
+
+		past_holidays = get_holiday_dates_between(past_list, start_date, end_date)
+		current_holidays = get_holiday_dates_between(current_list, start_date, end_date)
+		self.assertEqual(holidays, past_holidays)
+		self.assertNotEqual(holidays, current_holidays)
 
 	@HRMSTestSuite.change_settings("Payroll Settings", {"payroll_based_on": "Attendance"})
 	def test_payment_days_in_salary_slip_based_on_timesheet(self):

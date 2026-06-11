@@ -127,13 +127,15 @@ class BootStrapTestData:
 
 	def make_holiday_list_assignment(self):
 		fiscal_year = get_fiscal_year(getdate())
+		# Use an early from_date so the assignment resolves for historical `as_on`
+		# dates used across tests (the holiday list itself spans the current fiscal year).
 		records = [
 			{
 				"doctype": "Holiday List Assignment",
 				"applicable_for": "Company",
 				"assigned_to": "_Test Company",
 				"holiday_list": "Salary Slip Test Holiday List",
-				"from_date": fiscal_year[1],
+				"from_date": "2000-01-01",
 				"to_date": fiscal_year[2],
 			}
 		]
@@ -141,10 +143,12 @@ class BootStrapTestData:
 
 	def make_holiday_list(self):
 		fiscal_year = get_fiscal_year(getdate())
+		# Span an early from_date so the list (and its assignment) resolves for the
+		# historical `as_on` dates used across tests.
 		records = [
 			{
 				"doctype": "Holiday List",
-				"from_date": fiscal_year[1],
+				"from_date": "2000-01-01",
 				"to_date": fiscal_year[2],
 				"holiday_list_name": "Salary Slip Test Holiday List",
 				"weekly_off": "Sunday",
